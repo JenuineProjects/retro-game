@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retro Snake</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #0a0a0a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Courier New', monospace;
+        }
+
+        .game-container {
+            text-align: center;
+        }
+
+        h1 {
+            color: #33ff33;
+            text-shadow: 0 0 10px #33ff33, 0 0 20px #33ff33;
+            margin-bottom: 10px;
+            font-size: 2.5rem;
+            letter-spacing: 4px;
+        }
+
+        .score-board {
+            display: flex;
+            justify-content: space-between;
+            max-width: 400px;
+            margin: 0 auto 10px;
+            padding: 10px;
+            background: #1a1a1a;
+            border: 2px solid #33ff33;
+        }
+
+        .score, .high-score {
+            color: #33ff33;
+            font-size: 1.2rem;
+        }
+
+        .power-up-indicator {
+            color: #00ffff;
+            font-size: 1rem;
+            margin-top: 5px;
+            height: 20px;
+            text-shadow: 0 0 10px #00ffff;
+            animation: pulse 0.5s infinite alternate;
+        }
+
+        @keyframes pulse {
+            from { opacity: 0.7; }
+            to { opacity: 1; }
+        }
+
+        .ghost-active #gameCanvas {
+            border-color: #00ffff;
+            box-shadow: 0 0 30px #00ffff, inset 0 0 30px rgba(0, 255, 255, 0.2);
+        }
+
+        #gameCanvas {
+            border: 4px solid #33ff33;
+            box-shadow: 0 0 20px #33ff33, inset 0 0 20px rgba(51, 255, 51, 0.1);
+            background-color: #0a0a0a;
+        }
+
+        .controls {
+            margin-top: 20px;
+            color: #33ff33;
+            font-size: 0.9rem;
+        }
+
+        .controls p {
+            margin: 5px 0;
+        }
+
+        .game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            border: 3px solid #ff3333;
+            padding: 30px;
+            display: none;
+            z-index: 10;
+        }
+
+        .game-over h2 {
+            color: #ff3333;
+            text-shadow: 0 0 10px #ff3333;
+            margin-bottom: 20px;
+            font-size: 2rem;
+        }
+
+        .game-over p {
+            color: #33ff33;
+            margin-bottom: 20px;
+        }
+
+        .restart-btn {
+            background: #1a1a1a;
+            color: #33ff33;
+            border: 2px solid #33ff33;
+            padding: 10px 30px;
+            font-family: 'Courier New', monospace;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .restart-btn:hover {
+            background: #33ff33;
+            color: #0a0a0a;
+        }
+
+        .mobile-controls {
+            display: none;
+            margin-top: 20px;
+            gap: 5px;
+        }
+
+        .mobile-controls button {
+            width: 60px;
+            height: 60px;
+            font-size: 1.5rem;
+            background: #1a1a1a;
+            color: #33ff33;
+            border: 2px solid #33ff33;
+            cursor: pointer;
+        }
+
+        .mobile-controls button:active {
+            background: #33ff33;
+            color: #0a0a0a;
+        }
+
+        .d-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 60px);
+            grid-template-rows: repeat(3, 60px);
+            gap: 5px;
+            justify-content: center;
+        }
+
+        .d-pad button:nth-child(1) { grid-column: 2; grid-row: 1; }
+        .d-pad button:nth-child(2) { grid-column: 1; grid-row: 2; }
+        .d-pad button:nth-child(3) { grid-column: 3; grid-row: 2; }
+        .d-pad button:nth-child(4) { grid-column: 2; grid-row: 3; }
+
+        @media (max-width: 500px) {
+            .mobile-controls {
+                display: block;
+            }
+            h1 {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>SNAKE</h1>
+        <div class="score-board">
+            <span class="score">SCORE: <span id="score">0</span></span>
+            <span class="high-score">HIGH: <span id="highScore">0</span></span>
+        </div>
+        <div class="power-up-indicator" id="powerUpIndicator"></div>
+        <canvas id="gameCanvas" width="400" height="400"></canvas>
+        <div class="controls">
+            <p>Use ARROW KEYS or WASD to move</p>
+            <p>Press SPACE to pause</p>
+        </div>
+        <div class="mobile-controls">
+            <div class="d-pad">
+                <button id="upBtn">&#9650;</button>
+                <button id="leftBtn">&#9664;</button>
+                <button id="rightBtn">&#9654;</button>
+                <button id="downBtn">&#9660;</button>
+            </div>
+        </div>
+        <div class="game-over" id="gameOver">
+            <h2>GAME OVER</h2>
+            <p>Final Score: <span id="finalScore">0</span></p>
+            <button class="restart-btn" id="restartBtn">PLAY AGAIN</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const highScoreElement = document.getElementById('highScore');
+        const gameOverScreen = document.getElementById('gameOver');
+        const finalScoreElement = document.getElementById('finalScore');
+        const restartBtn = document.getElementById('restartBtn');
+        const powerUpIndicator = document.getElementById('powerUpIndicator');
+        const gameContainer = document.querySelector('.game-container');
+
+        const gridSize = 20;
+        const tileCount = canvas.width / gridSize;
+
+        let snake = [];
+        let food = {};
+        let direction = { x: 1, y: 0 };
+        let nextDirection = { x: 1, y: 0 };
+        let score = 0;
+        let highScore = localStorage.getItem('snakeHighScore') || 0;
+        let gameLoop;
+        let gameSpeed = 200; // Start slower
+        let isPaused = false;
+        let isGameOver = false;
+
+        // Ghost mode variables
+        let isGhostMode = false;
+        let ghostModeTimer = 0;
+        let ghostModeInterval = null;
+        const GHOST_MODE_DURATION = 10; // seconds
+        const GHOST_MODE_CHANCE = 0.25; // 25% chance when eating food
+
+        highScoreElement.textContent = highScore;
+
+        function init() {
+            snake = [
+                { x: 5, y: 10 },
+                { x: 4, y: 10 },
+                { x: 3, y: 10 }
+            ];
+            direction = { x: 1, y: 0 };
+            nextDirection = { x: 1, y: 0 };
+            score = 0;
+            gameSpeed = 200; // Start slower
+            isPaused = false;
+            isGameOver = false;
+
+            // Reset ghost mode
+            deactivateGhostMode();
+
+            scoreElement.textContent = score;
+            gameOverScreen.style.display = 'none';
+            spawnFood();
+            if (gameLoop) clearInterval(gameLoop);
+            gameLoop = setInterval(update, gameSpeed);
+        }
+
+        function activateGhostMode() {
+            if (isGhostMode) {
+                // Extend duration if already active
+                ghostModeTimer = GHOST_MODE_DURATION;
+                return;
+            }
+
+            isGhostMode = true;
+            ghostModeTimer = GHOST_MODE_DURATION;
+            gameContainer.classList.add('ghost-active');
+
+            ghostModeInterval = setInterval(() => {
+                ghostModeTimer--;
+                powerUpIndicator.textContent = `GHOST MODE: ${ghostModeTimer}s`;
+
+                if (ghostModeTimer <= 0) {
+                    deactivateGhostMode();
+                }
+            }, 1000);
+
+            powerUpIndicator.textContent = `GHOST MODE: ${ghostModeTimer}s`;
+        }
+
+        function deactivateGhostMode() {
+            isGhostMode = false;
+            ghostModeTimer = 0;
+            gameContainer.classList.remove('ghost-active');
+            powerUpIndicator.textContent = '';
+
+            if (ghostModeInterval) {
+                clearInterval(ghostModeInterval);
+                ghostModeInterval = null;
+            }
+        }
+
+        function spawnFood() {
+            do {
+                food = {
+                    x: Math.floor(Math.random() * tileCount),
+                    y: Math.floor(Math.random() * tileCount)
+                };
+            } while (snake.some(segment => segment.x === food.x && segment.y === food.y));
+        }
+
+        function update() {
+            if (isPaused || isGameOver) return;
+
+            direction = { ...nextDirection };
+
+            let head = {
+                x: snake[0].x + direction.x,
+                y: snake[0].y + direction.y
+            };
+
+            // Wall collision
+            if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
+                if (isGhostMode) {
+                    // Wrap around in ghost mode
+                    if (head.x < 0) head.x = tileCount - 1;
+                    if (head.x >= tileCount) head.x = 0;
+                    if (head.y < 0) head.y = tileCount - 1;
+                    if (head.y >= tileCount) head.y = 0;
+                } else {
+                    endGame();
+                    return;
+                }
+            }
+
+            // Self collision (still deadly even in ghost mode)
+            if (snake.some(segment => segment.x === head.x && segment.y === head.y)) {
+                endGame();
+                return;
+            }
+
+            snake.unshift(head);
+
+            // Food collision
+            if (head.x === food.x && head.y === food.y) {
+                score += 10;
+                scoreElement.textContent = score;
+                spawnFood();
+
+                // Random chance to activate ghost mode
+                if (Math.random() < GHOST_MODE_CHANCE) {
+                    activateGhostMode();
+                }
+
+                // Speed up gradually (from 200ms down to 60ms minimum)
+                if (gameSpeed > 60) {
+                    gameSpeed -= 3;
+                    clearInterval(gameLoop);
+                    gameLoop = setInterval(update, gameSpeed);
+                }
+            } else {
+                snake.pop();
+            }
+
+            draw();
+        }
+
+        function draw() {
+            // Clear canvas
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw grid (subtle)
+            ctx.strokeStyle = '#1a1a1a';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= tileCount; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * gridSize, 0);
+                ctx.lineTo(i * gridSize, canvas.height);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(0, i * gridSize);
+                ctx.lineTo(canvas.width, i * gridSize);
+                ctx.stroke();
+            }
+
+            // Draw snake
+            snake.forEach((segment, index) => {
+                if (isGhostMode) {
+                    // Ghost mode colors (cyan/transparent look)
+                    if (index === 0) {
+                        ctx.fillStyle = '#66ffff';
+                        ctx.shadowColor = '#00ffff';
+                        ctx.shadowBlur = 15;
+                    } else {
+                        ctx.fillStyle = 'rgba(0, 255, 255, 0.7)';
+                        ctx.shadowColor = '#00ffff';
+                        ctx.shadowBlur = 10;
+                    }
+                } else {
+                    // Normal colors
+                    if (index === 0) {
+                        ctx.fillStyle = '#66ff66';
+                        ctx.shadowColor = '#33ff33';
+                        ctx.shadowBlur = 10;
+                    } else {
+                        ctx.fillStyle = '#33ff33';
+                        ctx.shadowBlur = 5;
+                    }
+                }
+                ctx.fillRect(
+                    segment.x * gridSize + 1,
+                    segment.y * gridSize + 1,
+                    gridSize - 2,
+                    gridSize - 2
+                );
+            });
+
+            ctx.shadowBlur = 0;
+
+            // Draw food
+            ctx.fillStyle = '#ff3333';
+            ctx.shadowColor = '#ff3333';
+            ctx.shadowBlur = 15;
+            ctx.beginPath();
+            ctx.arc(
+                food.x * gridSize + gridSize / 2,
+                food.y * gridSize + gridSize / 2,
+                gridSize / 2 - 2,
+                0,
+                Math.PI * 2
+            );
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Draw pause text
+            if (isPaused) {
+                ctx.fillStyle = isGhostMode ? '#00ffff' : '#33ff33';
+                ctx.font = '30px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText('PAUSED', canvas.width / 2, canvas.height / 2);
+            }
+        }
+
+        function endGame() {
+            isGameOver = true;
+            clearInterval(gameLoop);
+            deactivateGhostMode();
+
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('snakeHighScore', highScore);
+                highScoreElement.textContent = highScore;
+            }
+
+            finalScoreElement.textContent = score;
+            gameOverScreen.style.display = 'block';
+        }
+
+        function changeDirection(newDir) {
+            if (isGameOver) return;
+
+            const opposites = {
+                'up': 'down',
+                'down': 'up',
+                'left': 'right',
+                'right': 'left'
+            };
+
+            const currentDir = direction.x === 1 ? 'right' :
+                              direction.x === -1 ? 'left' :
+                              direction.y === 1 ? 'down' : 'up';
+
+            if (opposites[newDir] === currentDir) return;
+
+            switch (newDir) {
+                case 'up':
+                    nextDirection = { x: 0, y: -1 };
+                    break;
+                case 'down':
+                    nextDirection = { x: 0, y: 1 };
+                    break;
+                case 'left':
+                    nextDirection = { x: -1, y: 0 };
+                    break;
+                case 'right':
+                    nextDirection = { x: 1, y: 0 };
+                    break;
+            }
+        }
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            switch (e.key) {
+                case 'ArrowUp':
+                case 'w':
+                case 'W':
+                    e.preventDefault();
+                    changeDirection('up');
+                    break;
+                case 'ArrowDown':
+                case 's':
+                case 'S':
+                    e.preventDefault();
+                    changeDirection('down');
+                    break;
+                case 'ArrowLeft':
+                case 'a':
+                case 'A':
+                    e.preventDefault();
+                    changeDirection('left');
+                    break;
+                case 'ArrowRight':
+                case 'd':
+                case 'D':
+                    e.preventDefault();
+                    changeDirection('right');
+                    break;
+                case ' ':
+                    e.preventDefault();
+                    if (!isGameOver) {
+                        isPaused = !isPaused;
+                        draw();
+                    }
+                    break;
+            }
+        });
+
+        // Mobile controls
+        document.getElementById('upBtn').addEventListener('click', () => changeDirection('up'));
+        document.getElementById('downBtn').addEventListener('click', () => changeDirection('down'));
+        document.getElementById('leftBtn').addEventListener('click', () => changeDirection('left'));
+        document.getElementById('rightBtn').addEventListener('click', () => changeDirection('right'));
+
+        // Restart button
+        restartBtn.addEventListener('click', init);
+
+        // Start game
+        init();
+    </script>
+</body>
+</html>
